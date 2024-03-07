@@ -27,8 +27,7 @@ template <typename T> struct AlphaBeta {
 template <typename DataType, typename DistType = float, size_t Channels = 3u> class GEDAD final {
    public:
     explicit GEDAD(size_t buffer_size) noexcept
-        : _buffer_flag(false),
-          _buffer_cidx(0),
+        : _buffer_cidx(0),
           _buffer_size(buffer_size),
           _view_size(0),
           _shift_dist(1),
@@ -88,16 +87,11 @@ template <typename DataType, typename DistType = float, size_t Channels = 3u> cl
     }
 
     inline bool pushToBuffer(const array<DataType, Channels>& channel_data) noexcept {
-        if (_buffer_flag.load()) {
-            return false;
-        }
-        _buffer_flag.store(true);
+        auto buffer_cidx = _buffer_cidx.load();
         for (size_t i = 0; i < Channels; ++i) {
-            _buffer[i][_buffer_cidx % _buffer_size] = channel_data[i];
+            _buffer[i][buffer_cidx % _buffer_size] = channel_data[i];
         }
-        _buffer_cidx = _buffer_cidx + 1;
-        _buffer_flag.store(false);
-        return true;
+        _buffer_cidx.store(buffer_cidx + 1);
     }
 
     void calEuclideanDistThresh(size_t                                      window_start,
@@ -109,11 +103,6 @@ template <typename DataType, typename DistType = float, size_t Channels = 3u> cl
                                 size_t                                      shift_dist,
                                 size_t                                      minimal_n,
                                 const array<AlphaBeta<DistType>, Channels>& thresh_calibration) {
-        while (_buffer_flag.load()) {
-            continue;
-        }
-        _buffer_flag.store(true);
-
         // verify and assign parameters to member variables
         {
             assert(window_size >= 1);
@@ -218,18 +207,13 @@ template <typename DataType, typename DistType = float, size_t Channels = 3u> cl
             // debug print
             printEuclideanDistThresh();
         }
-
-        _buffer_flag.store(false);
     }
 
     inline AnomalyType isLastViewAnomaly(float anormality_tolerance = 0.05f) const {
         // take last view_size elements from the _buffer (ring buffer)
         // copy them to the _cached_view
-        if (_buffer_flag.load()) {
-            return AnomalyType::Unknown;
-        }
-        _buffer_flag.store(true);
-        size_t view_start_idx = (_buffer_cidx - _view_size) % _buffer_size;
+        size_t buffer_cidx = _buffer_cidx.load();
+        size_t view_start_idx = (buffer_cidx - _view_size) % _buffer_size;
         for (size_t i = 0; i < Channels; ++i) {
             auto& view_per_channel_i = _cached_view[i];
             // check cache buffer size, resize if necessary
@@ -241,7 +225,6 @@ template <typename DataType, typename DistType = float, size_t Channels = 3u> cl
                 view_per_channel_i[j] = _buffer[i][(view_start_idx + j) % _buffer_size];
             }
         }
-        _buffer_flag.store(false);
 
         // debug print cached view
         printCachedView();
@@ -304,9 +287,8 @@ template <typename DataType, typename DistType = float, size_t Channels = 3u> cl
     }
 
    private:
-    mutable atomic<bool> _buffer_flag;
-    volatile size_t      _buffer_cidx;
-    const size_t         _buffer_size;
+    atomic<size_t> _buffer_cidx;
+    const size_t   _buffer_size;
 
     size_t _view_size;
     size_t _shift_dist;
