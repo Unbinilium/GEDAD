@@ -86,7 +86,7 @@ template <typename DataType, typename DistType = float, size_t Channels = 3u> cl
         }
     }
 
-    inline bool pushToBuffer(const array<DataType, Channels>& channel_data) noexcept {
+    inline void pushToBuffer(const array<DataType, Channels>& channel_data) noexcept {
         auto buffer_cidx = _buffer_cidx.load();
         for (size_t i = 0; i < Channels; ++i) {
             _buffer[i][buffer_cidx % _buffer_size] = channel_data[i];
