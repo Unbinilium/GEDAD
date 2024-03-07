@@ -259,7 +259,7 @@ template <typename DataType, typename DistType = float, size_t Channels = 3u> cl
             for (size_t j = 0; j < window_end; j += _shift_dist) {
                 DistType euclidean_dist{};
                 for (size_t k = 0; k < _view_size; ++k) {
-                    euclidean_dist += pow(window_i[j + k] - view_i[k], 2);
+                    euclidean_dist += pow(view_i[k] - window_i[j + k], 2);
                 }
                 euclidean_dist = sqrt(euclidean_dist);
                 if (euclidean_dist < thresh_i) [[unlikely]] {
